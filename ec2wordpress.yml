@@ -1,0 +1,125 @@
+Parameters:
+  SubnetId:
+    Description: ID of the subnet where the EC2 will be launched
+    Type: String
+  Engineer: 
+    Description: Name Of Engineer Who Launched Configuration
+    Type: String
+    Default: "Unknown"
+  DBName: 
+    Default: wordpress
+    Description: The WordPress database name
+    Type: String
+  DBUsername:
+    Default: admin
+    Description: Wordpress database username
+    Type: String
+  DBRootPassword:
+    Description: wordpress database password
+    Type: String
+  DBEndPoint:
+    Description: wordpress database endpoint address 
+    Type: String
+  VPC:
+    Type: String
+  PrivateSubnetID1:
+    Type: String
+  PrivateSubnetID2:
+    Type: String
+  PublicSubnetCIDR1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/24
+    Description: VPC CIDR Block for Public Subnet 1 (eg 10.0.0.0/24)
+    Type: String
+  PublicSubnetCIDR2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.1.0/24
+    Description: VPC CIDR Block for Public Subnet 2 (eg 10.0.1.0/24)
+    Type: String
+  PrivateSubnetCIDR1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.2.0/24
+    Description: VPC CIDR Block for Private Subnet 1 (eg 10.0.2.0/24)
+    Type: String
+  PrivateSubnetCIDR2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.3.0/24
+    Description: VPC CIDR Block for Private Subnet 2 (eg 10.0.3.0/24)
+    Type: String
+  VPCCidrBlock:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/16
+    Description: VPC CIDR Block (eg 10.0.0.0/16)
+    Type: String
+
+Resources:
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WordpressEC2SecurityGroup
+      GroupDescription: Allows incoming traffic on port 80 and 443, allows mysql 3306 incoming traffic from VPCs private subnets
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: !Ref PrivateSubnetCIDR1
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+        - CidrIp: !Ref PrivateSubnetCIDR2
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0    
+
+  EC2Wordpress:
+    Type: AWS::EC2::Instance
+    Properties: 
+      NetworkInterfaces:  #this block assigns public ip
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - Ref: EC2SecurityGroup
+          SubnetId:
+            Ref: SubnetId
+      ImageId: ami-0c94855ba95c71c99 #latest amazon linux ami
+      InstanceType: t2.micro # this instance type keeps us in the free tier
+      # bash script to install and configure a wordpress server 
+      UserData: 
+        Fn::Base64: 
+              !Sub |
+                #!/bin/bash
+                yum install -y httpd
+                service httpd start
+                wget https://wordpress.org/latest.tar.gz
+                tar -xzf latest.tar.gz
+                cp -r wordpress/* /var/www/html/
+                rm -r wordpress
+                rm -rf latest.tar.gz
+                cd /var/www/html
+                cp wp-config-sample.php wp-config.php
+                sed -i 's/database_name_here/${DBName}/g' wp-config.php 
+                sed -i 's/username_here/${DBUsername}/g' wp-config.php
+                sed -i 's/password_here/${DBRootPassword}/g' wp-config.php 
+                sed -i 's/localhost/${DBEndPoint}/g' wp-config.php 
+                curl https://api.wordpress.org/secret-key/1.1/salt/ --output saltKey.txt
+                sed -i -e '/NONCE_SALT/{r saltKey.txt' -e 'd}' wp-config.php
+                sed -i '/put your unique phrase here/d' wp-config.php
+                amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+                service httpd restart
+      Tags:
+        - Key: Engineer
+          Value: !Ref Engineer
+
+Outputs:
+  PublicIP: #this output lets us use the public ip of wordpress ec2 to use for route53 dns routing
+    Description: Wordpress Server Public IP
+    Value: !GetAtt EC2Wordpress.PublicIp
+    Export:
+      Name: PublicIP

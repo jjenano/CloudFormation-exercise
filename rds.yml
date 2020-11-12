@@ -1,0 +1,110 @@
+Parameters:
+  PrivateSubnetID1:
+    Description: SubnetIDs to populate DB Subnet Group
+    Type: String
+  PrivateSubnetID2:
+    Description: SubnetIDs to populate DB Subnet Group
+    Type: String
+  PublicSubnetID1:
+    Description: Accept traffic to the DB from this cidr block
+    Type: String
+  PublicSubnetID2:
+    Description: Accept traffic to the DB from this cidr block
+    Type: String
+  Engineer: 
+    Description: Name Of Engineer Who Launched Configuration
+    Type: String
+    Default: "Unknown"
+  Username:
+    Description: Master Username for Database
+    Type: String
+    Default: admin
+  Password:
+    Description: Master Password for Database
+    Type: String
+  VPC:
+    Description: vpc for the environment
+    Type: String
+  VPCCidrBlock:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/16
+    Description: VPC CIDR Block (eg 10.0.0.0/16)
+    Type: String
+  PublicSubnetCIDR1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/24
+    Description: VPC CIDR Block for Public Subnet 1 (eg 10.0.0.0/24)
+    Type: String
+  PublicSubnetCIDR2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.1.0/24
+    Description: VPC CIDR Block for Public Subnet 2 (eg 10.0.1.0/24)
+    Type: String
+  PrivateSubnetCIDR1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.2.0/24
+    Description: VPC CIDR Block for Private Subnet 1 (eg 10.0.2.0/24)
+    Type: String
+  PrivateSubnetCIDR2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.3.0/24
+    Description: VPC CIDR Block for Private Subnet 2 (eg 10.0.3.0/24)
+    Type: String
+  DBName: 
+    Type: String
+
+
+Resources:
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: WordpressRDSSecurityGroup
+      GroupDescription: allows incoming mysql connection
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: !Ref PublicSubnetCIDR1
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: group of subnets to place database in
+      DBSubnetGroupName: mysubnetgroup
+      SubnetIds: 
+        - !Ref PrivateSubnetID1
+        - !Ref PrivateSubnetID2
+      Tags: 
+        - Key: Engineer
+          Value: !Ref Engineer
+  RDS: 
+    Type: AWS::RDS::DBInstance
+    Properties: 
+      DBName: !Ref DBName
+      AllocatedStorage: 5
+      DBInstanceClass: db.t2.micro
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBName: !Ref DBName 
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      Engine: MySQL
+      MasterUsername: !Ref Username
+      MasterUserPassword: !Ref Password
+      Port: 3306
+      VPCSecurityGroups:
+        - !GetAtt DBSecurityGroup.GroupId
+      Tags: 
+        - Key: Engineer
+          Value: !Ref Engineer           
+
+Outputs:
+  RDS:
+    Description: MySQL Database For Wordpress
+    Value: !Ref RDS
+    Export:
+      Name: RDS
+  DBEndpoint:
+    Description: connection endpoint for the database.
+    Value: !GetAtt  RDS.Endpoint.Address
+    Export:
+      Name: "DBEndpoint"

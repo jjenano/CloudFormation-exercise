@@ -1,0 +1,13 @@
+Parameters:
+    ec2PublicIP:
+        Type: String
+
+Resources:
+    DNS:
+        Type: AWS::Route53::RecordSet
+        Properties:
+            HostedZoneId: Z2LZ45JUYPDLLV
+            Name: jjenano.training.trambo.cloud
+            ResourceRecords: [!Ref ec2PublicIP]
+            TTL: '900'      
+            Type: A
