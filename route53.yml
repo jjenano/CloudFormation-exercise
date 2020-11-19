@@ -6,8 +6,8 @@ Resources:
     DNS:
         Type: AWS::Route53::RecordSet
         Properties:
-            HostedZoneId: Z2LZ45JUYPDLLV
-            Name: jjenano.training.trambo.cloud
+            HostedZoneId: Z1001812ZAY4J3FHO8MW
+            Name: jjenano.pruebas.cloud
             ResourceRecords: [!Ref ec2PublicIP]
             TTL: '900'      
             Type: A
